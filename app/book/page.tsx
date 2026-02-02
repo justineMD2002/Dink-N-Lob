@@ -20,7 +20,9 @@ export default function BookPage() {
  const [selectedCourtId, setSelectedCourtId] = useState<string>('')
  const [selectedDate, setSelectedDate] = useState<string | null>(null)
  const [selectedTime, setSelectedTime] = useState<string | null>(null)
+ const [selectedEndTime, setSelectedEndTime] = useState<string | null>(null)
  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
+ const [endTimeSlots, setEndTimeSlots] = useState<TimeSlot[]>([])
  const [paymentMethod, setPaymentMethod] = useState<'GCASH' | 'MAYA'>('GCASH')
  const [loading, setLoading] = useState(false)
  const [error, setError] = useState<string | null>(null)
@@ -58,10 +60,38 @@ export default function BookPage() {
  .then((data) => {
  setTimeSlots(data)
  setSelectedTime(null)
+ setSelectedEndTime(null)
  })
  .catch((err) => console.error('Error fetching slots:', err))
  }
  }, [selectedDate, selectedCourtId])
+ useEffect(() => {
+ if (selectedTime && selectedDate && selectedCourtId) {
+ const startHour = parseInt(selectedTime.split(':')[0])
+ const potentialEndTimes: TimeSlot[] = []
+ for (let hours = 1; hours <= 16; hours++) {
+ const endHour = startHour + hours
+ if (endHour > 22) break
+ const endTime = `${endHour.toString().padStart(2, '0')}:00`
+ const allSlotsAvailable = timeSlots.every((slot) => {
+ const slotHour = parseInt(slot.time.split(':')[0])
+ if (slotHour >= startHour && slotHour < endHour) {
+ return slot.available
+ }
+ return true
+ })
+ potentialEndTimes.push({
+ time: endTime,
+ available: allSlotsAvailable
+ })
+ }
+ setEndTimeSlots(potentialEndTimes)
+ setSelectedEndTime(null)
+ } else {
+ setEndTimeSlots([])
+ setSelectedEndTime(null)
+ }
+ }, [selectedTime, timeSlots, selectedDate, selectedCourtId])
  useEffect(() => {
  const handleEscape = (e: KeyboardEvent) => {
  if (e.key === 'Escape') {
@@ -80,8 +110,8 @@ export default function BookPage() {
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault()
  setError(null)
- if (!selectedDate || !selectedTime || !selectedCourtId) {
- setError('Please select a date, time, and court')
+ if (!selectedDate || !selectedTime || !selectedEndTime || !selectedCourtId) {
+ setError('Please select a date, start time, end time, and court')
  return
  }
  const phoneRegex = /^(09\d{9}|\+639\d{9})$/
@@ -91,16 +121,19 @@ export default function BookPage() {
  }
  setLoading(true)
  try {
- const endHour = parseInt(selectedTime.split(':')[0]) + 1
- const endTime = `${endHour.toString().padStart(2, '0')}:00`
+ const startHour = parseInt(selectedTime.split(':')[0])
+ const endHour = parseInt(selectedEndTime.split(':')[0])
+ const durationHours = endHour - startHour
+ const durationMinutes = durationHours * 60
+ const totalAmount = durationHours * 299
  const bookingData = {
  ...formData,
  court_id: selectedCourtId,
  date: selectedDate,
  start_time: selectedTime,
- end_time: endTime,
- duration: 60,
- total_amount: 500,
+ end_time: selectedEndTime,
+ duration: durationMinutes,
+ total_amount: totalAmount,
  payment_method: paymentMethod,
  }
  const response = await fetch('/api/bookings', {
@@ -151,7 +184,7 @@ export default function BookPage() {
  {selectedDate && (
  <div className="mt-4">
  <h3 className="text-base sm:text-lg font-semibold mb-2 text-gray-900">
- Available Time Slots
+ Select Start Time
  </h3>
  {timeSlots.length > 0 ? (
  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -176,6 +209,37 @@ export default function BookPage() {
  </div>
  ) : (
  <p className="text-sm text-gray-500 ">Loading time slots...</p>
+ )}
+ </div>
+ )}
+ {selectedTime && (
+ <div className="mt-4">
+ <h3 className="text-base sm:text-lg font-semibold mb-2 text-gray-900">
+ Select End Time
+ </h3>
+ {endTimeSlots.length > 0 ? (
+ <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+ {endTimeSlots.map((slot) => (
+ <button
+ key={slot.time}
+ onClick={() => slot.available && setSelectedEndTime(slot.time)}
+ disabled={!slot.available}
+ className={`
+ px-3 sm:px-4 py-2 text-sm sm:text-base border rounded transition
+ ${!slot.available
+ ? 'bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed'
+ : selectedEndTime === slot.time
+ ? 'bg-primary border-primary text-white'
+ : 'bg-white border-gray-300 text-gray-900 hover:bg-primary/10 hover:border-primary'
+ }
+ `}
+ >
+ {slot.time}
+ </button>
+ ))}
+ </div>
+ ) : (
+ <p className="text-sm text-gray-500">No end times available</p>
  )}
  </div>
  )}
@@ -280,7 +344,16 @@ export default function BookPage() {
  />
  </button>
  <p className="text-xs text-gray-500 mt-1">Click to enlarge</p>
- <p className="text-base sm:text-lg font-bold text-primary mt-2">₱500.00</p>
+ <p className="text-base sm:text-lg font-bold text-primary mt-2">
+ {selectedTime && selectedEndTime
+ ? `₱${((parseInt(selectedEndTime.split(':')[0]) - parseInt(selectedTime.split(':')[0])) * 299).toFixed(2)}`
+ : '₱299.00'}
+ </p>
+ {selectedTime && selectedEndTime && (
+ <p className="text-xs text-gray-600 mt-1">
+ {parseInt(selectedEndTime.split(':')[0]) - parseInt(selectedTime.split(':')[0])} hour(s) × ₱299/hr
+ </p>
+ )}
  </div>
  <div>
  <label className="block text-sm font-medium mb-1 text-gray-700 ">Payment Reference Code</label>
@@ -296,7 +369,7 @@ export default function BookPage() {
  </div>
  <button
  type="submit"
- disabled={loading || !selectedDate || !selectedTime}
+ disabled={loading || !selectedDate || !selectedTime || !selectedEndTime}
  className="w-full bg-primary text-white py-3 sm:py-4 rounded-lg hover:bg-primary/90 transition font-semibold text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed"
  >
  {loading ? 'Processing...' : 'Confirm Booking'}
@@ -342,7 +415,16 @@ export default function BookPage() {
  className="object-contain"
  />
  </div>
- <p className="text-2xl font-bold text-primary mt-4 text-center">₱500.00</p>
+ <p className="text-2xl font-bold text-primary mt-4 text-center">
+ {selectedTime && selectedEndTime
+ ? `₱${((parseInt(selectedEndTime.split(':')[0]) - parseInt(selectedTime.split(':')[0])) * 299).toFixed(2)}`
+ : '₱299.00'}
+ </p>
+ {selectedTime && selectedEndTime && (
+ <p className="text-sm text-gray-600 mt-1 text-center">
+ {parseInt(selectedEndTime.split(':')[0]) - parseInt(selectedTime.split(':')[0])} hour(s) × ₱299/hr
+ </p>
+ )}
  <p className="text-sm text-gray-600 mt-2 text-center">
  Scan this QR code with your {paymentMethod === 'GCASH' ? 'GCash' : 'Maya'} app
  </p>

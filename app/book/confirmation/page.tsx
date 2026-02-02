@@ -26,6 +26,15 @@ export default function ConfirmationPage() {
   const [bookingData, setBookingData] = useState<BookingData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  const copyLinkToClipboard = () => {
+    const currentUrl = window.location.href
+    navigator.clipboard.writeText(currentUrl).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }
 
   useEffect(() => {
     const fetchBookingData = () => {
@@ -149,6 +158,39 @@ export default function ConfirmationPage() {
             <p className="text-2xl sm:text-3xl font-bold text-primary">{bookingData.booking_number}</p>
             <p className="text-xs sm:text-sm text-gray-500 mt-2">Please save this number for your reference</p>
           </div>
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="text-sm sm:text-base font-semibold text-yellow-800 mb-1">Important: Save This Link!</h3>
+                <p className="text-xs sm:text-sm text-yellow-700 mb-2">
+                  Bookmark this page or save this link to track your booking status. This is the only way to check if your payment has been verified and your booking confirmed.
+                </p>
+                <button
+                  onClick={copyLinkToClipboard}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs sm:text-sm rounded-md transition font-medium"
+                >
+                  {linkCopied ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Link Copied!
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      Copy Link
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
           <div className="border-t pt-3 sm:pt-4">
             <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-900">Booking Details</h2>
             <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
@@ -223,18 +265,22 @@ export default function ConfirmationPage() {
           <ul className="space-y-2 text-xs sm:text-sm text-gray-700">
             <li className="flex items-start">
               <span className="text-primary font-bold mr-2">1.</span>
-              <span>Our team will verify your payment within 24 hours</span>
+              <span><strong>Save this link</strong> - Bookmark this page to track your booking status in real-time</span>
             </li>
             <li className="flex items-start">
               <span className="text-primary font-bold mr-2">2.</span>
-              <span>You will receive an email confirmation once verified</span>
+              <span>Our team will verify your payment within 24 hours</span>
             </li>
             <li className="flex items-start">
               <span className="text-primary font-bold mr-2">3.</span>
-              <span>Please arrive 10 minutes before your scheduled time</span>
+              <span>You will receive an email confirmation once verified</span>
             </li>
             <li className="flex items-start">
               <span className="text-primary font-bold mr-2">4.</span>
+              <span>Please arrive 10 minutes before your scheduled time</span>
+            </li>
+            <li className="flex items-start">
+              <span className="text-primary font-bold mr-2">5.</span>
               <span>Bring your booking number for check-in</span>
             </li>
           </ul>
