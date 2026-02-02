@@ -1,0 +1,308 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 358 97% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 358 97% 55%;
+    --chart-1: 358 97% 55%;
+    --chart-2: 358 70% 45%;
+    --chart-3: 358 50% 35%;
+    --chart-4: 0 0% 45%;
+    --chart-5: 0 0% 65%;
+    --radius: 0.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 0 0% 100%;
+      --foreground: 0 0% 10%;
+    }
+  }
+
+  body {
+    @apply bg-white text-gray-900;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  /* Input fields should always have dark text on light background */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  textarea,
+  select {
+    @apply text-gray-900 bg-white border-gray-300;
+  }
+  .dark {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 358 97% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 358 97% 55%;
+    --chart-1: 358 97% 55%;
+    --chart-2: 358 70% 45%;
+    --chart-3: 358 50% 35%;
+    --chart-4: 0 0% 45%;
+    --chart-5: 0 0% 65%;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Print Styles */
+@media print {
+  @page {
+    margin: 0.5in;
+    size: letter;
+  }
+
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide elements that shouldn't print */
+  .print\:hidden,
+  button,
+  [role="button"]:not(table *) {
+    display: none !important;
+  }
+
+  /* Show elements only in print */
+  .print\:block {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Force visibility on print elements */
+  .print\:block * {
+    visibility: visible !important;
+  }
+
+  /* Hide dialog overlay */
+  [data-radix-dialog-overlay],
+  [data-state="open"][data-radix-portal] > div:first-child {
+    display: none !important;
+  }
+
+  /* Make dialog content printable */
+  [role="dialog"] {
+    position: relative !important;
+    transform: none !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    inset: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide scrollbars */
+  *::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  * {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+
+  /* Hide gradients and backgrounds in print */
+  .bg-gradient-to-b,
+  .dark\:bg-gray-900,
+  .dark\:bg-gray-800,
+  .bg-green-50,
+  .bg-blue-50 {
+    background: white !important;
+  }
+
+  /* Ensure text is readable */
+  .dark\:text-white,
+  .dark\:text-gray-100,
+  .dark\:text-gray-300,
+  .text-gray-900,
+  .text-gray-800,
+  .text-gray-700 {
+    color: black !important;
+  }
+
+  .dark\:text-gray-400,
+  .text-gray-600,
+  .text-gray-500 {
+    color: #4a5568 !important;
+  }
+
+  /* Keep status badge colors */
+  .bg-yellow-100,
+  .dark\:bg-yellow-900\/30 {
+    background-color: #fef3c7 !important;
+    border: 1px solid #f59e0b !important;
+  }
+
+  .text-yellow-800,
+  .dark\:text-yellow-500 {
+    color: #92400e !important;
+  }
+
+  /* Keep green colors for amounts */
+  .text-green-600,
+  .dark\:text-green-500,
+  .text-green-700,
+  .dark\:text-green-700 {
+    color: #059669 !important;
+  }
+
+  .bg-green-50,
+  .dark\:bg-green-900\/30 {
+    background-color: #d1fae5 !important;
+  }
+
+  /* Optimize layout for print */
+  .max-w-2xl,
+  .max-w-7xl {
+    max-width: 100% !important;
+  }
+
+  /* Remove shadows */
+  .shadow-lg {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* Ensure borders are visible */
+  .border-green-200,
+  .dark\:border-green-700 {
+    border-color: #059669 !important;
+  }
+
+  /* Page breaks */
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Adjust font sizes for print */
+  body {
+    font-size: 9pt;
+  }
+  h1 {
+    font-size: 16pt;
+    margin-top: 0;
+  }
+  h2 {
+    font-size: 12pt;
+  }
+
+  /* Table styling for print */
+  table td, table th {
+    font-size: 8pt !important;
+    padding: 4px !important;
+  }
+
+  /* Fix borders */
+  table, th, td {
+    border: 1px solid #ccc !important;
+  }
+
+  /* Remove rounded corners in print */
+  * {
+    border-radius: 0 !important;
+  }
+
+  /* Ensure report content is visible */
+  #report-content {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  #report-content * {
+    visibility: visible !important;
+  }
+
+  /* Show table content */
+  table, thead, tbody, tr, td, th {
+    display: table !important;
+    visibility: visible !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
+  }
+
+  tr {
+    display: table-row !important;
+  }
+
+  td, th {
+    display: table-cell !important;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
