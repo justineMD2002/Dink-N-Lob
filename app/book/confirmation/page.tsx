@@ -2,6 +2,7 @@
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { createClient } from '@/lib/supabase/client'
 interface BookingData {
   booking_number: string
   customer_name: string
@@ -24,17 +25,63 @@ export default function ConfirmationPage() {
   const [bookingData, setBookingData] = useState<BookingData | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
+    const fetchBookingData = () => {
+      if (bookingNumber) {
+        fetch(`/api/bookings/${bookingNumber}`)
+          .then((res) => res.json())
+          .then((data) => {
+            setBookingData(data)
+            setLoading(false)
+          })
+          .catch((err) => {
+            console.error('Error fetching booking:', err)
+            setLoading(false)
+          })
+      }
+    }
+
+    fetchBookingData()
+
     if (bookingNumber) {
-      fetch(`/api/bookings/${bookingNumber}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setBookingData(data)
-          setLoading(false)
-        })
-        .catch((err) => {
-          console.error('Error fetching booking:', err)
-          setLoading(false)
-        })
+      const supabase = createClient()
+
+      // Subscribe to bookings changes
+      const bookingsChannel = supabase
+        .channel('confirmation-bookings-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings',
+          },
+          (payload) => {
+            fetchBookingData()
+          }
+        )
+        .subscribe()
+
+      // Subscribe to payments changes
+      const paymentsChannel = supabase
+        .channel('confirmation-payments-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'payments',
+          },
+          (payload) => {
+            fetchBookingData()
+          }
+        )
+        .subscribe()
+
+      // Cleanup subscriptions on unmount
+      return () => {
+        supabase.removeChannel(bookingsChannel)
+        supabase.removeChannel(paymentsChannel)
+      }
     }
   }, [bookingNumber])
   if (loading) {
@@ -68,8 +115,18 @@ export default function ConfirmationPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Booking Confirmed!</h1>
-            <p className="text-sm sm:text-base text-gray-600">Your booking has been received and is pending verification.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              {bookingData.status === 'CONFIRMED' ? 'Booking Confirmed!' :
+               bookingData.status === 'CANCELLED' ? 'Booking Cancelled' :
+               'Booking Received!'}
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600">
+              {bookingData.status === 'CONFIRMED'
+                ? 'Your booking has been verified and confirmed.'
+                : bookingData.status === 'CANCELLED'
+                ? 'Your booking has been cancelled by the admin.'
+                : 'Your booking has been received and is pending verification.'}
+            </p>
           </div>
           <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-center">
             <p className="text-xs sm:text-sm text-gray-600 mb-1">Your Booking Number</p>
@@ -122,7 +179,15 @@ export default function ConfirmationPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Status:</span>
-                <span className="px-3 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full text-sm font-semibold">
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  bookingData.status === 'CONFIRMED'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : bookingData.status === 'PENDING_VERIFICATION'
+                    ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                    : bookingData.status === 'CANCELLED'
+                    ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-gray-50 text-gray-700 border border-gray-200'
+                }`}>
                   {bookingData.status.replace('_', ' ')}
                 </span>
               </div>

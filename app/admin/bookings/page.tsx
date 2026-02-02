@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -17,8 +18,25 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { Eye, Check, X } from 'lucide-react'
+interface Payment {
+  id: string
+  payment_method: string
+  reference_code: string
+  status: string
+}
+
 interface Booking {
   id: string
   booking_number: string
@@ -32,12 +50,7 @@ interface Booking {
   total_amount: string
   notes: string | null
   court: { name: string }
-  payment: Array<{
-    id: string
-    payment_method: string
-    reference_code: string
-    status: string
-  }>
+  payment: Payment | Payment[]
 }
 export default function BookingsPage() {
   const { toast } = useToast()
@@ -46,8 +59,51 @@ export default function BookingsPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [bookingToReject, setBookingToReject] = useState<Booking | null>(null)
   useEffect(() => {
     fetchBookings()
+
+    const supabase = createClient()
+
+    // Subscribe to bookings changes
+    const bookingsChannel = supabase
+      .channel('bookings-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+        },
+        (payload) => {
+          fetchBookings()
+        }
+      )
+      .subscribe()
+
+    // Subscribe to payments changes
+    const paymentsChannel = supabase
+      .channel('payments-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments',
+        },
+        (payload) => {
+          fetchBookings()
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      supabase.removeChannel(bookingsChannel)
+      supabase.removeChannel(paymentsChannel)
+    }
   }, [])
   const fetchBookings = async () => {
     try {
@@ -72,7 +128,20 @@ export default function BookingsPage() {
     setSheetOpen(true)
   }
   const handleConfirm = async (booking: Booking) => {
-    if (!booking.payment || booking.payment.length === 0) {
+    if (!booking || !booking.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Invalid booking data.',
+      })
+      return
+    }
+
+    const payment = Array.isArray(booking.payment)
+      ? booking.payment[0]
+      : booking.payment
+
+    if (!payment || !payment.id) {
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -80,22 +149,26 @@ export default function BookingsPage() {
       })
       return
     }
+
     setActionLoading(booking.id)
     try {
       const response = await fetch('/api/admin/payments/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          paymentId: booking.payment[0].id,
+          paymentId: payment.id,
           approved: true,
         }),
       })
       if (response.ok) {
+        const data = await response.json()
         toast({
           title: 'Success',
           description: 'Booking confirmed successfully',
+          className: 'bg-green-50 border-green-200 text-green-900',
         })
         fetchBookings()
+        setSheetOpen(false)
       } else {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to confirm booking')
@@ -110,8 +183,21 @@ export default function BookingsPage() {
       setActionLoading(null)
     }
   }
-  const handleReject = async (booking: Booking) => {
-    if (!booking.payment || booking.payment.length === 0) {
+  const handleReject = (booking: Booking) => {
+    if (!booking || !booking.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Invalid booking data.',
+      })
+      return
+    }
+
+    const payment = Array.isArray(booking.payment)
+      ? booking.payment[0]
+      : booking.payment
+
+    if (!payment || !payment.id) {
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -119,27 +205,68 @@ export default function BookingsPage() {
       })
       return
     }
-    const reason = prompt('Enter rejection reason:')
-    if (!reason) return
-    setActionLoading(booking.id)
+    setBookingToReject(booking)
+    setRejectionReason('')
+    setRejectModalOpen(true)
+  }
+  const handleRejectSubmit = async () => {
+    if (!bookingToReject || !bookingToReject.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Invalid booking data.',
+      })
+      setRejectModalOpen(false)
+      return
+    }
+
+    if (!rejectionReason.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Please enter a rejection reason',
+      })
+      return
+    }
+
+    const payment = Array.isArray(bookingToReject.payment)
+      ? bookingToReject.payment[0]
+      : bookingToReject.payment
+
+    if (!payment || !payment.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No payment record found for this booking.',
+      })
+      setRejectModalOpen(false)
+      return
+    }
+
+    setActionLoading(bookingToReject.id)
+    setRejectModalOpen(false)
     try {
       const response = await fetch('/api/admin/payments/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          paymentId: booking.payment[0].id,
+          paymentId: payment.id,
           approved: false,
-          rejectionReason: reason,
+          rejectionReason: rejectionReason.trim(),
         }),
       })
       if (response.ok) {
+        const data = await response.json()
         toast({
           title: 'Success',
           description: 'Booking rejected successfully',
+          className: 'bg-green-50 border-green-200 text-green-900',
         })
         fetchBookings()
+        setSheetOpen(false)
       } else {
-        throw new Error('Failed to reject booking')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to reject booking')
       }
     } catch (error) {
       toast({
@@ -149,6 +276,8 @@ export default function BookingsPage() {
       })
     } finally {
       setActionLoading(null)
+      setBookingToReject(null)
+      setRejectionReason('')
     }
   }
   const getStatusBadge = (status: string) => {
@@ -222,9 +351,9 @@ export default function BookingsPage() {
                           <>
                             <Button
                               size="sm"
-                              variant="default"
                               onClick={() => handleConfirm(booking)}
                               disabled={actionLoading === booking.id}
+                              className="bg-green-600 hover:bg-green-700 text-white"
                             >
                               <Check className="h-4 w-4" />
                             </Button>
@@ -307,37 +436,39 @@ export default function BookingsPage() {
                   )}
                 </div>
               </div>
-              {selectedBooking.payment[0] && (
-                <div>
-                  <h3 className="font-semibold mb-3">Payment Information</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Method:</span>
-                      <span className="font-medium">
-                        {selectedBooking.payment[0].payment_method}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Reference:</span>
-                      <span className="font-medium">
-                        {selectedBooking.payment[0].reference_code}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      {getStatusBadge(selectedBooking.payment[0].status)}
+              {(() => {
+                const payment = Array.isArray(selectedBooking.payment)
+                  ? selectedBooking.payment[0]
+                  : selectedBooking.payment
+                return payment && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Payment Information</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Method:</span>
+                        <span className="font-medium">
+                          {payment.payment_method}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Reference:</span>
+                        <span className="font-medium">
+                          {payment.reference_code}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Status:</span>
+                        {getStatusBadge(payment.status)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
               {selectedBooking.status === 'PENDING_VERIFICATION' && (
                 <div className="flex gap-2 pt-4">
                   <Button
-                    className="flex-1"
-                    onClick={() => {
-                      handleConfirm(selectedBooking)
-                      setSheetOpen(false)
-                    }}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleConfirm(selectedBooking)}
                     disabled={actionLoading === selectedBooking.id}
                   >
                     <Check className="h-4 w-4 mr-2" />
@@ -346,10 +477,7 @@ export default function BookingsPage() {
                   <Button
                     className="flex-1"
                     variant="destructive"
-                    onClick={() => {
-                      handleReject(selectedBooking)
-                      setSheetOpen(false)
-                    }}
+                    onClick={() => handleReject(selectedBooking)}
                     disabled={actionLoading === selectedBooking.id}
                   >
                     <X className="h-4 w-4 mr-2" />
@@ -361,6 +489,47 @@ export default function BookingsPage() {
           )}
         </SheetContent>
       </Sheet>
+      <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Booking</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this booking. The customer will be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection-reason">Rejection Reason</Label>
+              <Textarea
+                id="rejection-reason"
+                placeholder="Enter the reason for rejection..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRejectModalOpen(false)
+                setRejectionReason('')
+                setBookingToReject(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectSubmit}
+              disabled={!rejectionReason.trim()}
+            >
+              Reject Booking
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

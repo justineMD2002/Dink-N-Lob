@@ -26,6 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { FileText, Download, Printer } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 interface ReportData {
@@ -58,6 +59,7 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
   const [reportData, setReportData] = useState<ReportData[]>([])
   const [showPreview, setShowPreview] = useState(false)
   const [filterSummary, setFilterSummary] = useState('')
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['CONFIRMED', 'PENDING_VERIFICATION', 'CANCELLED', 'COMPLETED'])
   const years = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - i).toString())
   const months = [
     { value: '01', label: 'January' },
@@ -121,7 +123,7 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
     setLoading(true)
     try {
       const { start, end, summary } = getDateRange()
-      const { data, error } = await supabase
+      let query = supabase
         .from('bookings')
         .select(`
           booking_number,
@@ -138,6 +140,12 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
         `)
         .gte('date', start)
         .lte('date', end)
+
+      if (selectedStatuses.length > 0) {
+        query = query.in('status', selectedStatuses)
+      }
+
+      const { data, error } = await query
         .order('date', { ascending: false })
         .order('start_time', { ascending: false })
       if (error) throw error
@@ -156,10 +164,17 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
         reference_code: booking.payment?.[0]?.reference_code || 'N/A',
       }))
       setReportData(formattedData)
-      setFilterSummary(summary)
+
+      // Add status info to summary if not all statuses are selected
+      let finalSummary = summary
+      if (selectedStatuses.length > 0 && selectedStatuses.length < 4) {
+        const statusLabels = selectedStatuses.map(s => s.replace('_', ' ')).join(', ')
+        finalSummary += ` (Status: ${statusLabels})`
+      }
+
+      setFilterSummary(finalSummary)
       setShowPreview(true)
     } catch (error) {
-      console.error('Error generating report:', error)
       alert('Failed to generate report')
     } finally {
       setLoading(false)
@@ -244,6 +259,9 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                   onClick={() => {
                     setFilterType('quick')
                     setQuickAction('today')
+                    setStartDate('')
+                    setEndDate('')
+                    setSelectedMonth('')
                   }}
                 >
                   Today
@@ -254,6 +272,9 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                   onClick={() => {
                     setFilterType('quick')
                     setQuickAction('week')
+                    setStartDate('')
+                    setEndDate('')
+                    setSelectedMonth('')
                   }}
                 >
                   This Week
@@ -264,6 +285,9 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                   onClick={() => {
                     setFilterType('quick')
                     setQuickAction('month')
+                    setStartDate('')
+                    setEndDate('')
+                    setSelectedMonth('')
                   }}
                 >
                   This Month
@@ -271,8 +295,28 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
               </div>
             </div>
 
-            <div className="space-y-3 border-t pt-4">
-              <Label className="text-base font-semibold">Filter by Date Range</Label>
+            <div className={`space-y-3 border-t pt-4 transition-opacity ${filterType === 'year' ? 'opacity-50' : ''}`}>
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Filter by Date Range</Label>
+                {filterType === 'year' && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto py-0 px-2 text-xs"
+                    onClick={() => {
+                      setFilterType('quick')
+                      setStartDate('')
+                      setEndDate('')
+                    }}
+                  >
+                    Clear & Enable
+                  </Button>
+                )}
+              </div>
+              {filterType === 'year' && (
+                <p className="text-xs text-muted-foreground">Year/Month filter is active. Clear it to use date range.</p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="start-date" className="text-sm">Start Date</Label>
@@ -280,6 +324,7 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                     id="start-date"
                     type="date"
                     value={startDate}
+                    disabled={filterType === 'year'}
                     onChange={(e) => {
                       setStartDate(e.target.value)
                       if (e.target.value && endDate) {
@@ -294,6 +339,7 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                     id="end-date"
                     type="date"
                     value={endDate}
+                    disabled={filterType === 'year'}
                     onChange={(e) => {
                       setEndDate(e.target.value)
                       if (startDate && e.target.value) {
@@ -305,19 +351,39 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
               </div>
             </div>
 
-            <div className="space-y-3 border-t pt-4">
-              <Label className="text-base font-semibold">Filter by Year/Month</Label>
+            <div className={`space-y-3 border-t pt-4 transition-opacity ${filterType === 'range' ? 'opacity-50' : ''}`}>
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Filter by Year/Month</Label>
+                {filterType === 'range' && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto py-0 px-2 text-xs"
+                    onClick={() => {
+                      setFilterType('quick')
+                      setSelectedMonth('')
+                    }}
+                  >
+                    Clear & Enable
+                  </Button>
+                )}
+              </div>
+              {filterType === 'range' && (
+                <p className="text-xs text-muted-foreground">Date range filter is active. Clear it to use year/month.</p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="year-select" className="text-sm">Filter by Year</Label>
                   <Select
                     value={selectedYear}
+                    disabled={filterType === 'range'}
                     onValueChange={(value) => {
                       setSelectedYear(value)
                       setFilterType('year')
                     }}
                   >
-                    <SelectTrigger id="year-select">
+                    <SelectTrigger id="year-select" disabled={filterType === 'range'}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -333,6 +399,7 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                   <Label htmlFor="month-select" className="text-sm">Filter by Month (Optional)</Label>
                   <Select
                     value={selectedMonth || 'all'}
+                    disabled={filterType === 'range'}
                     onValueChange={(value) => {
                       setSelectedMonth(value === 'all' ? '' : value)
                       if (selectedYear) {
@@ -340,7 +407,7 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                       }
                     }}
                   >
-                    <SelectTrigger id="month-select">
+                    <SelectTrigger id="month-select" disabled={filterType === 'range'}>
                       <SelectValue placeholder="All months" />
                     </SelectTrigger>
                     <SelectContent>
@@ -353,6 +420,35 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-base font-semibold">Filter by Status</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: 'CONFIRMED', label: 'Confirmed' },
+                  { value: 'PENDING_VERIFICATION', label: 'Pending Verification' },
+                  { value: 'CANCELLED', label: 'Cancelled' },
+                  { value: 'COMPLETED', label: 'Completed' },
+                ].map((status) => (
+                  <div key={status.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={status.value}
+                      checked={selectedStatuses.includes(status.value)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedStatuses([...selectedStatuses, status.value])
+                        } else {
+                          setSelectedStatuses(selectedStatuses.filter((s) => s !== status.value))
+                        }
+                      }}
+                    />
+                    <Label htmlFor={status.value} className="text-sm font-normal cursor-pointer">
+                      {status.label}
+                    </Label>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -471,10 +567,10 @@ export function ReportGenerator({ open, onOpenChange }: ReportGeneratorProps) {
               <Download className="w-4 h-4 mr-2" />
               Download CSV
             </Button>
-            <Button onClick={handlePrint} disabled={reportData.length === 0}>
+            {/* <Button onClick={handlePrint} disabled={reportData.length === 0}>
               <Printer className="w-4 h-4 mr-2" />
               Print Report
-            </Button>
+            </Button> */}
           </div>
         </DialogContent>
       </Dialog>

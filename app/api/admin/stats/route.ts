@@ -28,19 +28,17 @@ export async function GET() {
       .from('bookings')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'CONFIRMED')
-    const { data: confirmedBookings } = await supabase
+
+    const { count: cancelledCount } = await supabase
       .from('bookings')
-      .select('total_amount')
-      .eq('status', 'CONFIRMED')
-    const totalRevenue = confirmedBookings?.reduce(
-      (sum, booking) => sum + parseFloat(booking.total_amount.toString()),
-      0
-    ) || 0
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'CANCELLED')
+
     return NextResponse.json({
       totalBookings: totalBookings || 0,
       pendingVerification: pendingCount || 0,
       confirmed: confirmedCount || 0,
-      totalRevenue: totalRevenue.toFixed(2),
+      cancelled: cancelledCount || 0,
     })
   } catch (error) {
     console.error('Error fetching stats:', error)

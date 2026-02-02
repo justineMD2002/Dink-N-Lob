@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -11,12 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Calendar, DollarSign, Clock, CheckCircle, BarChart3 } from 'lucide-react'
+import { Calendar, DollarSign, Clock, CheckCircle, BarChart3, X } from 'lucide-react'
 interface Stats {
   totalBookings: number
   pendingVerification: number
   confirmed: number
-  totalRevenue: string
+  cancelled: number
 }
 interface Booking {
   id: string
@@ -35,13 +36,55 @@ export default function AdminDashboard() {
     totalBookings: 0,
     pendingVerification: 0,
     confirmed: 0,
-    totalRevenue: '0',
+    cancelled: 0,
   })
   const [recentBookings, setRecentBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     fetchStats()
     fetchRecentBookings()
+
+    const supabase = createClient()
+
+    // Subscribe to bookings changes
+    const bookingsChannel = supabase
+      .channel('dashboard-bookings-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+        },
+        (payload) => {
+          fetchStats()
+          fetchRecentBookings()
+        }
+      )
+      .subscribe()
+
+    // Subscribe to payments changes
+    const paymentsChannel = supabase
+      .channel('dashboard-payments-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments',
+        },
+        (payload) => {
+          fetchStats()
+          fetchRecentBookings()
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      supabase.removeChannel(bookingsChannel)
+      supabase.removeChannel(paymentsChannel)
+    }
   }, [])
   const fetchStats = async () => {
     try {
@@ -117,12 +160,12 @@ export default function AdminDashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
+              <X className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₱{stats.totalRevenue}</div>
-              <p className="text-xs text-muted-foreground">From confirmed bookings</p>
+              <div className="text-2xl font-bold">{stats.cancelled}</div>
+              <p className="text-xs text-muted-foreground">Rejected bookings</p>
             </CardContent>
           </Card>
         </div>

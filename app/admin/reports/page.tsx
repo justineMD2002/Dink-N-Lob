@@ -44,13 +44,34 @@ export default function ReportsPage() {
   const fetchReportData = async () => {
     try {
       setLoading(true)
-      const { data: bookings, error } = await supabase
+
+      const today = new Date()
+      let dateFilter = null
+
+      if (period === 'today') {
+        dateFilter = today.toISOString().split('T')[0]
+      } else if (period === 'week') {
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDate() - today.getDay())
+        dateFilter = weekStart.toISOString().split('T')[0]
+      } else if (period === 'month') {
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+        dateFilter = monthStart.toISOString().split('T')[0]
+      }
+
+      let query = supabase
         .from('bookings')
         .select(`
           *,
           court:courts(name),
           payment:payments(payment_method, amount)
         `)
+
+      if (dateFilter) {
+        query = query.gte('date', dateFilter)
+      }
+
+      const { data: bookings, error } = await query
       if (error) throw error
       const totalBookings = bookings?.length || 0
       const confirmedBookings = bookings?.filter((b) => b.status === 'CONFIRMED') || []
@@ -67,7 +88,10 @@ export default function ReportsPage() {
       const topCourt = Object.entries(courtCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
       const paymentCounts: Record<string, number> = {}
       bookings?.forEach((booking) => {
-        const method = booking.payment?.[0]?.payment_method || 'Unknown'
+        const payment = Array.isArray(booking.payment)
+          ? booking.payment[0]
+          : booking.payment
+        const method = payment?.payment_method || 'Unknown'
         paymentCounts[method] = (paymentCounts[method] || 0) + 1
       })
       const topPaymentMethod = Object.entries(paymentCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
@@ -102,7 +126,6 @@ export default function ReportsPage() {
         bookingsByDay,
       })
     } catch (error) {
-      console.error('Error fetching report data:', error)
     } finally {
       setLoading(false)
     }
