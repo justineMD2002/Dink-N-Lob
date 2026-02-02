@@ -5,6 +5,16 @@ export async function GET(
   { params }: { params: { bookingNumber: string } }
 ) {
   const { bookingNumber } = params
+  const { searchParams } = new URL(request.url)
+  const token = searchParams.get('token')
+
+  if (!token) {
+    return NextResponse.json(
+      { error: 'Verification token required' },
+      { status: 401 }
+    )
+  }
+
   const supabase = await createClient()
   const { data: booking, error } = await supabase
     .from('bookings')
@@ -14,12 +24,15 @@ export async function GET(
       payment:payments(*)
     `)
     .eq('booking_number', bookingNumber)
+    .eq('verification_token', token)
     .single()
+
   if (error || !booking) {
     return NextResponse.json(
-      { error: 'Booking not found' },
+      { error: 'Booking not found or invalid verification token' },
       { status: 404 }
     )
   }
+
   return NextResponse.json(booking)
 }

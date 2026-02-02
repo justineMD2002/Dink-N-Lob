@@ -115,7 +115,7 @@ export default function BookPage() {
  throw new Error(errorData.error || 'Failed to create booking')
  }
  const booking = await response.json()
- router.push(`/book/confirmation?bookingNumber=${booking.booking_number}`)
+ router.push(`/book/confirmation?bookingNumber=${booking.booking_number}&token=${booking.verification_token}`)
  } catch (err) {
  setError(err instanceof Error ? err.message : 'An error occurred')
  } finally {

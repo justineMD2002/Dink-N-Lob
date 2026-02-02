@@ -22,30 +22,41 @@ interface BookingData {
 export default function ConfirmationPage() {
   const searchParams = useSearchParams()
   const bookingNumber = searchParams.get('bookingNumber')
+  const token = searchParams.get('token')
   const [bookingData, setBookingData] = useState<BookingData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
     const fetchBookingData = () => {
-      if (bookingNumber) {
-        fetch(`/api/bookings/${bookingNumber}`)
-          .then((res) => res.json())
+      if (bookingNumber && token) {
+        fetch(`/api/bookings/${bookingNumber}?token=${encodeURIComponent(token)}`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error('Invalid or unauthorized access')
+            }
+            return res.json()
+          })
           .then((data) => {
             setBookingData(data)
+            setError(null)
             setLoading(false)
           })
           .catch((err) => {
-            console.error('Error fetching booking:', err)
+            setError(err.message || 'Failed to load booking')
             setLoading(false)
           })
+      } else {
+        setError('Missing booking information')
+        setLoading(false)
       }
     }
 
     fetchBookingData()
 
-    if (bookingNumber) {
+    if (bookingNumber && token) {
       const supabase = createClient()
 
-      // Subscribe to bookings changes
       const bookingsChannel = supabase
         .channel('confirmation-bookings-changes')
         .on(
@@ -61,7 +72,6 @@ export default function ConfirmationPage() {
         )
         .subscribe()
 
-      // Subscribe to payments changes
       const paymentsChannel = supabase
         .channel('confirmation-payments-changes')
         .on(
@@ -77,13 +87,12 @@ export default function ConfirmationPage() {
         )
         .subscribe()
 
-      // Cleanup subscriptions on unmount
       return () => {
         supabase.removeChannel(bookingsChannel)
         supabase.removeChannel(paymentsChannel)
       }
     }
-  }, [bookingNumber])
+  }, [bookingNumber, token])
   if (loading) {
     return (
       <div className="min-h-screen bg-white p-3 sm:p-4 flex items-center justify-center">
@@ -91,12 +100,19 @@ export default function ConfirmationPage() {
       </div>
     )
   }
-  if (!bookingData) {
+  if (error || !bookingData) {
     return (
       <div className="min-h-screen bg-white p-3 sm:p-4 flex items-center justify-center">
         <div className="text-center">
           <img src="/logo.png" alt="Dink N' Lob" className="w-20 h-20 mx-auto mb-4 object-contain" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Booking Not Found</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            {error === 'Invalid or unauthorized access' ? 'Unauthorized Access' : 'Booking Not Found'}
+          </h1>
+          <p className="text-gray-600 mb-4">
+            {error === 'Invalid or unauthorized access'
+              ? 'The link you used is invalid or has expired.'
+              : 'We could not find the booking you are looking for.'}
+          </p>
           <Link href="/book" className="text-primary hover:underline">
             Make a new booking
           </Link>
@@ -131,47 +147,55 @@ export default function ConfirmationPage() {
           <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-center">
             <p className="text-xs sm:text-sm text-gray-600 mb-1">Your Booking Number</p>
             <p className="text-2xl sm:text-3xl font-bold text-primary">{bookingData.booking_number}</p>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">Please save this number for your reference</p>
+            <p className="text-xs sm:text-sm text-gray-500 mt-2">Please save this number for your reference</p>
           </div>
-          <div className="border-t dark:border-gray-700 pt-3 sm:pt-4">
-            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">Booking Details</h2>
+          <div className="border-t pt-3 sm:pt-4">
+            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-900">Booking Details</h2>
             <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Name:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.customer_name}</span>
+                <span className="text-gray-600">Name:</span>
+                <span className="font-semibold text-gray-900">{bookingData.customer_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Email:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.customer_email}</span>
+                <span className="text-gray-600">Email:</span>
+                <span className="font-semibold text-gray-900">{bookingData.customer_email}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Phone:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.customer_phone}</span>
+                <span className="text-gray-600">Phone:</span>
+                <span className="font-semibold text-gray-900">{bookingData.customer_phone}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Court:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.court.name}</span>
+                <span className="text-gray-600">Court:</span>
+                <span className="font-semibold text-gray-900">{bookingData.court.name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Date:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.date}</span>
+                <span className="text-gray-600">Date:</span>
+                <span className="font-semibold text-gray-900">{bookingData.date}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Time:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.start_time} - {bookingData.end_time}</span>
+                <span className="text-gray-600">Time:</span>
+                <span className="font-semibold text-gray-900">{bookingData.start_time} - {bookingData.end_time}</span>
               </div>
             </div>
           </div>
-          <div className="border-t dark:border-gray-700 mt-3 sm:mt-4 pt-3 sm:pt-4">
-            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">Payment Details</h2>
+          <div className="border-t mt-3 sm:mt-4 pt-3 sm:pt-4">
+            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-900">Payment Details</h2>
             <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Payment Method:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.payment[0]?.payment_method}</span>
+                <span className="text-gray-600">Payment Method:</span>
+                <span className="font-semibold text-gray-900">
+                  {Array.isArray(bookingData.payment)
+                    ? bookingData.payment[0]?.payment_method
+                    : bookingData.payment?.payment_method}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Reference Code:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{bookingData.payment[0]?.reference_code}</span>
+                <span className="text-gray-600">Reference Code:</span>
+                <span className="font-semibold text-gray-900">
+                  {Array.isArray(bookingData.payment)
+                    ? bookingData.payment[0]?.reference_code
+                    : bookingData.payment?.reference_code}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Paid:</span>

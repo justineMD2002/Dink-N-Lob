@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -17,6 +19,9 @@ export async function POST(request: NextRequest) {
       payment_method,
       reference_code,
     } = body
+
+    const verificationToken = crypto.randomBytes(32).toString('hex')
+
     const supabase = await createClient()
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
@@ -32,6 +37,7 @@ export async function POST(request: NextRequest) {
         total_amount,
         notes,
         status: 'PENDING_VERIFICATION',
+        verification_token: verificationToken,
       })
       .select()
       .single()
