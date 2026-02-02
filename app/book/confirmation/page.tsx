@@ -247,7 +247,7 @@ export default function ConfirmationPage() {
                 <span className="text-gray-600">Status:</span>
                 <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
                   bookingData.status === 'CONFIRMED'
-                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    ? 'bg-green-500 text-white border border-green-600'
                     : bookingData.status === 'PENDING_VERIFICATION'
                     ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
                     : bookingData.status === 'CANCELLED'
