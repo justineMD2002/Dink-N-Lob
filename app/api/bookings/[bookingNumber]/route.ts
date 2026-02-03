@@ -4,9 +4,10 @@ import { decryptBookingReference } from '@/lib/encryption'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { bookingNumber: string } }
+  context: { params: Promise<{ bookingNumber: string }> }
 ) {
   const { searchParams } = new URL(request.url)
+  const params = await context.params
 
   // Check if using encrypted reference (new method)
   const encryptedRef = searchParams.get('ref')
