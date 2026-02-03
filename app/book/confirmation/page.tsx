@@ -17,7 +17,10 @@ interface BookingData {
   payment: {
     payment_method: string
     reference_code: string
-  }[]
+  }[] | {
+    payment_method: string
+    reference_code: string
+  }
 }
 export default function ConfirmationPage() {
   const searchParams = useSearchParams()
