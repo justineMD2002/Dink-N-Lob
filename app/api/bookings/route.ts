@@ -60,6 +60,32 @@ export async function POST(request: NextRequest) {
     const total_amount = calculateBookingAmount(start_time, end_time)
     const duration = calculateDuration(start_time, end_time)
 
+    // Prevent booking past time slots for today
+    const now = new Date()
+    const bookingDate = new Date(date)
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const isToday = bookingDate.getTime() === todayDate.getTime()
+
+    if (isToday) {
+      const currentHour = now.getHours()
+      const startHour = parseInt(start_time.split(':')[0])
+
+      if (startHour < currentHour) {
+        return NextResponse.json(
+          { error: 'Cannot book past time slots. Please select a current or future time.' },
+          { status: 400 }
+        )
+      }
+
+      // Additional check: if it's the current hour, ensure not too late
+      if (startHour === currentHour && now.getMinutes() > 15) {
+        return NextResponse.json(
+          { error: 'This time slot is no longer available. Please select a later time.' },
+          { status: 400 }
+        )
+      }
+    }
+
     const verificationToken = crypto.randomBytes(32).toString('hex')
 
     const supabase = await createClient()

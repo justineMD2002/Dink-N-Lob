@@ -281,8 +281,8 @@ export default function BookingsPage() {
     }
   }
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      CONFIRMED: 'default',
+    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success'> = {
+      CONFIRMED: 'success',
       PENDING_VERIFICATION: 'secondary',
       CANCELLED: 'destructive',
       COMPLETED: 'outline',

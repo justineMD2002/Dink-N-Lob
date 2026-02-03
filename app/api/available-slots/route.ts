@@ -1,5 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+
+interface TimeSlot {
+  time: string
+  available: boolean
+}
+
 const OPERATING_START = '06:00'
 const OPERATING_END = '22:00'
 const SLOT_DURATION = 60
@@ -34,14 +40,39 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   const allSlots = generateTimeSlots()
-  const availableSlots = allSlots.map((time) => {
-    const isBooked = bookings?.some((booking) => {
-      return time >= booking.start_time && time < booking.end_time
+
+  // Get current date and time
+  const now = new Date()
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
+  const todayDate = now.toISOString().split('T')[0]
+  const isToday = date === todayDate
+
+  const availableSlots = allSlots
+    .map((time) => {
+      const slotHour = parseInt(time.split(':')[0])
+
+      // Filter out past time slots if booking is for today
+      if (isToday) {
+        // If current time is past this hour, don't show it
+        if (slotHour < currentHour) {
+          return null
+        }
+        // If it's the current hour but past the booking cutoff (e.g., 15 minutes into the hour)
+        if (slotHour === currentHour && currentMinute > 15) {
+          return null
+        }
+      }
+
+      const isBooked = bookings?.some((booking) => {
+        return time >= booking.start_time && time < booking.end_time
+      })
+
+      return {
+        time,
+        available: !isBooked,
+      }
     })
-    return {
-      time,
-      available: !isBooked,
-    }
-  })
+    .filter(slot => slot !== null) as TimeSlot[]
   return NextResponse.json(availableSlots)
 }

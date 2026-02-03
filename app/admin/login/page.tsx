@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -7,9 +7,41 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+          // Check if user is an admin
+          const { data: adminData } = await supabase
+            .from('admin_users')
+            .select('id')
+            .eq('user_id', user.id)
+            .single()
+
+          if (adminData) {
+            // User is already logged in as admin, redirect to dashboard
+            router.push('/admin')
+            return
+          }
+        }
+      } catch (err) {
+        // User not logged in, show login form
+        console.error('Auth check error:', err)
+      } finally {
+        setChecking(false)
+      }
+    }
+
+    checkAuth()
+  }, [router, supabase])
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -37,6 +69,18 @@ export default function AdminLoginPage() {
       setLoading(false)
     }
   }
+  // Show loading state while checking auth
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="max-w-md w-full">
