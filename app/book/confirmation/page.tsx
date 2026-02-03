@@ -3,6 +3,9 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { createClient } from '@/lib/supabase/client'
+
+// Force dynamic rendering to avoid SSR issues with searchParams
+export const dynamic = 'force-dynamic'
 interface BookingData {
   booking_number: string
   customer_name: string
