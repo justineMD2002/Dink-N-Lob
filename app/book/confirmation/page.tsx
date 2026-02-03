@@ -1,11 +1,8 @@
 'use client'
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { createClient } from '@/lib/supabase/client'
-
-// Force dynamic rendering to avoid SSR issues with searchParams
-export const dynamic = 'force-dynamic'
 interface BookingData {
   booking_number: string
   customer_name: string
@@ -25,7 +22,8 @@ interface BookingData {
     reference_code: string
   }
 }
-export default function ConfirmationPage() {
+
+function ConfirmationPageContent() {
   const searchParams = useSearchParams()
   const encryptedRef = searchParams.get('ref')
   // Fallback to old method for backward compatibility
@@ -337,4 +335,19 @@ export default function ConfirmationPage() {
       </div>
     </div>
   );
+}
+
+export default function ConfirmationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading booking details...</p>
+        </div>
+      </div>
+    }>
+      <ConfirmationPageContent />
+    </Suspense>
+  )
 }
