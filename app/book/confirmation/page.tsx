@@ -21,6 +21,8 @@ interface BookingData {
 }
 export default function ConfirmationPage() {
   const searchParams = useSearchParams()
+  const encryptedRef = searchParams.get('ref')
+  // Fallback to old method for backward compatibility
   const bookingNumber = searchParams.get('bookingNumber')
   const token = searchParams.get('token')
   const [bookingData, setBookingData] = useState<BookingData | null>(null)
@@ -38,7 +40,26 @@ export default function ConfirmationPage() {
 
   useEffect(() => {
     const fetchBookingData = () => {
-      if (bookingNumber && token) {
+      // Use encrypted reference if available, otherwise fall back to old method
+      if (encryptedRef) {
+        fetch(`/api/bookings/ref?ref=${encodeURIComponent(encryptedRef)}`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error('Invalid or unauthorized access')
+            }
+            return res.json()
+          })
+          .then((data) => {
+            setBookingData(data)
+            setError(null)
+            setLoading(false)
+          })
+          .catch((err) => {
+            setError(err.message || 'Failed to load booking')
+            setLoading(false)
+          })
+      } else if (bookingNumber && token) {
+        // Fallback to old method for backward compatibility
         fetch(`/api/bookings/${bookingNumber}?token=${encodeURIComponent(token)}`)
           .then((res) => {
             if (!res.ok) {
@@ -63,7 +84,7 @@ export default function ConfirmationPage() {
 
     fetchBookingData()
 
-    if (bookingNumber && token) {
+    if (encryptedRef || (bookingNumber && token)) {
       const supabase = createClient()
 
       const bookingsChannel = supabase
@@ -101,7 +122,7 @@ export default function ConfirmationPage() {
         supabase.removeChannel(paymentsChannel)
       }
     }
-  }, [bookingNumber, token])
+  }, [encryptedRef, bookingNumber, token])
   if (loading) {
     return (
       <div className="min-h-screen bg-white p-3 sm:p-4 flex items-center justify-center">

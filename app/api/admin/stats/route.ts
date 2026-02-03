@@ -1,38 +1,43 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyAdminAuth } from '@/lib/admin-auth'
+
+export async function GET(request: NextRequest) {
+  // Verify admin authentication
+  const authResult = await verifyAdminAuth()
+  if (!authResult.authorized) {
+    return authResult.response!
   }
-  const { data: adminData } = await supabase
-    .from('admin_users')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
-  if (!adminData) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+
   try {
-    const { count: totalBookings } = await supabase
+    const supabase = await createClient()
+
+    const { count: totalBookings, error: totalError } = await supabase
       .from('bookings')
       .select('*', { count: 'exact', head: true })
-    const { count: pendingCount } = await supabase
+
+    const { count: pendingCount, error: pendingError } = await supabase
       .from('bookings')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'PENDING_VERIFICATION')
-    const { count: confirmedCount } = await supabase
+
+    const { count: confirmedCount, error: confirmedError } = await supabase
       .from('bookings')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'CONFIRMED')
 
-    const { count: cancelledCount } = await supabase
+    const { count: cancelledCount, error: cancelledError } = await supabase
       .from('bookings')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'CANCELLED')
+
+    if (totalError || pendingError || confirmedError || cancelledError) {
+      console.error('Error fetching stats')
+      return NextResponse.json(
+        { error: 'Unable to fetch statistics' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       totalBookings: totalBookings || 0,
@@ -41,7 +46,10 @@ export async function GET() {
       cancelled: cancelledCount || 0,
     })
   } catch (error) {
-    console.error('Error fetching stats:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Unexpected error fetching stats:', error)
+    return NextResponse.json(
+      { error: 'An unexpected error occurred' },
+      { status: 500 }
+    )
   }
 }

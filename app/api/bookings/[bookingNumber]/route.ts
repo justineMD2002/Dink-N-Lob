@@ -1,18 +1,43 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { decryptBookingReference } from '@/lib/encryption'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { bookingNumber: string } }
 ) {
-  const { bookingNumber } = params
   const { searchParams } = new URL(request.url)
-  const token = searchParams.get('token')
 
-  if (!token) {
-    return NextResponse.json(
-      { error: 'Verification token required' },
-      { status: 401 }
-    )
+  // Check if using encrypted reference (new method)
+  const encryptedRef = searchParams.get('ref')
+
+  let bookingNumber: string
+  let token: string
+
+  if (encryptedRef) {
+    // Decrypt the reference
+    const decrypted = decryptBookingReference(encryptedRef)
+
+    if (!decrypted) {
+      return NextResponse.json(
+        { error: 'Invalid or corrupted booking reference' },
+        { status: 400 }
+      )
+    }
+
+    bookingNumber = decrypted.bookingNumber
+    token = decrypted.token
+  } else {
+    // Fallback to old method for backward compatibility
+    bookingNumber = params.bookingNumber
+    token = searchParams.get('token') || ''
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Verification token required' },
+        { status: 401 }
+      )
+    }
   }
 
   const supabase = await createClient()
