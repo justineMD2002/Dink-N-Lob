@@ -41,11 +41,18 @@ export async function GET(request: NextRequest) {
   }
   const allSlots = generateTimeSlots()
 
-  // Get current date and time
+  // Get current date and time in Philippines timezone (UTC+8)
   const now = new Date()
-  const currentHour = now.getHours()
-  const currentMinute = now.getMinutes()
-  const todayDate = now.toISOString().split('T')[0]
+  const philippinesTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+  const currentHour = philippinesTime.getHours()
+  const currentMinute = philippinesTime.getMinutes()
+
+  // Format today's date in YYYY-MM-DD format using Philippines timezone
+  const year = philippinesTime.getFullYear()
+  const month = String(philippinesTime.getMonth() + 1).padStart(2, '0')
+  const day = String(philippinesTime.getDate()).padStart(2, '0')
+  const todayDate = `${year}-${month}-${day}`
+
   const isToday = date === todayDate
 
   const availableSlots = allSlots
@@ -54,12 +61,8 @@ export async function GET(request: NextRequest) {
 
       // Filter out past time slots if booking is for today
       if (isToday) {
-        // If current time is past this hour, don't show it
+        // Only hide slots from previous hours (current hour still shows)
         if (slotHour < currentHour) {
-          return null
-        }
-        // If it's the current hour but past the booking cutoff (e.g., 15 minutes into the hour)
-        if (slotHour === currentHour && currentMinute > 15) {
           return null
         }
       }

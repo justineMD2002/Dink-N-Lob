@@ -60,27 +60,26 @@ export async function POST(request: NextRequest) {
     const total_amount = calculateBookingAmount(start_time, end_time)
     const duration = calculateDuration(start_time, end_time)
 
-    // Prevent booking past time slots for today
+    // Prevent booking past time slots for today (using Philippines timezone UTC+8)
     const now = new Date()
-    const bookingDate = new Date(date)
-    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const isToday = bookingDate.getTime() === todayDate.getTime()
+    const philippinesTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+    const currentHour = philippinesTime.getHours()
+    const currentMinute = philippinesTime.getMinutes()
+
+    // Format today's date in YYYY-MM-DD format using Philippines timezone
+    const year = philippinesTime.getFullYear()
+    const month = String(philippinesTime.getMonth() + 1).padStart(2, '0')
+    const day = String(philippinesTime.getDate()).padStart(2, '0')
+    const todayDate = `${year}-${month}-${day}`
+
+    const isToday = date === todayDate
 
     if (isToday) {
-      const currentHour = now.getHours()
       const startHour = parseInt(start_time.split(':')[0])
 
       if (startHour < currentHour) {
         return NextResponse.json(
           { error: 'Cannot book past time slots. Please select a current or future time.' },
-          { status: 400 }
-        )
-      }
-
-      // Additional check: if it's the current hour, ensure not too late
-      if (startHour === currentHour && now.getMinutes() > 15) {
-        return NextResponse.json(
-          { error: 'This time slot is no longer available. Please select a later time.' },
           { status: 400 }
         )
       }
